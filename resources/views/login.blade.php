@@ -33,7 +33,18 @@
 
                                 <div>
                                     <label class="form-label fw-semibold">Email</label>
-                                    <input class="form-control form-control-lg" type="email" name="email" placeholder="nama@email.com" required autocomplete="email">
+                                    <input
+                                        class="form-control form-control-lg @error('email') is-invalid @enderror"
+                                        type="email"
+                                        name="email"
+                                        placeholder="nama@email.com"
+                                        value="{{ old('email') }}"
+                                        required
+                                        autocomplete="email"
+                                    >
+                                    @error('email')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
 
                                 <div>
@@ -48,6 +59,9 @@
                                             required
                                             autocomplete="current-password"
                                         >
+                                        @error('password')
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                                        @enderror
                                         <button
                                             class="btn btn-sm btn-outline-secondary auth__password-toggle"
                                             type="button"

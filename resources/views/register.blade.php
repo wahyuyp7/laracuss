@@ -32,13 +32,35 @@
                                 @csrf
 
                                 <div>
-                                    <label class="form-label fw-semibold">Nama</label>
-                                    <input class="form-control form-control-lg" type="text" name="name" placeholder="Nama lengkap" required autocomplete="name">
+                                    <label class="form-label fw-semibold">Username</label>
+                                    <input
+                                        class="form-control form-control-lg @error('username') is-invalid @enderror"
+                                        type="text"
+                                        name="username"
+                                        placeholder="contoh: wahyu_dev"
+                                        value="{{ old('username') }}"
+                                        required
+                                        autocomplete="username"
+                                    >
+                                    @error('username')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
 
                                 <div>
                                     <label class="form-label fw-semibold">Email</label>
-                                    <input class="form-control form-control-lg" type="email" name="email" placeholder="nama@email.com" required autocomplete="email">
+                                    <input
+                                        class="form-control form-control-lg @error('email') is-invalid @enderror"
+                                        type="email"
+                                        name="email"
+                                        placeholder="nama@email.com"
+                                        value="{{ old('email') }}"
+                                        required
+                                        autocomplete="email"
+                                    >
+                                    @error('email')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
 
                                 <div>
@@ -53,6 +75,9 @@
                                             required
                                             autocomplete="new-password"
                                         >
+                                        @error('password')
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                                        @enderror
                                         <button
                                             class="btn btn-sm btn-outline-secondary auth__password-toggle"
                                             type="button"
@@ -88,10 +113,13 @@
                                 </div>
 
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" name="terms" id="termsCheckbox" required>
+                                    <input class="form-check-input @error('terms') is-invalid @enderror" type="checkbox" name="terms" id="termsCheckbox" required>
                                     <label class="form-check-label" for="termsCheckbox">
                                         Saya setuju dengan syarat & ketentuan.
                                     </label>
+                                    @error('terms')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
                                 </div>
 
                                 <button class="btn btn-primary btn-lg w-100" type="submit">

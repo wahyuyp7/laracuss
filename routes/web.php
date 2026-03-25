@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Auth;
 
 /*
 |--------------------------------------------------------------------------
@@ -73,32 +74,34 @@ function laracussDummyThreads(): array
     ];
 }
 
-// Create discussion (UI placeholder, belum tersimpan ke DB)
-Route::get('/discussion/create', function () {
-    return view('discussion-create');
+Route::middleware('auth')->group(function () {
+    // Create discussion (UI placeholder, belum tersimpan ke DB)
+    Route::get('/discussion/create', function () {
+        return view('discussion-create');
+    });
+
+    Route::post('/discussion/create', function (\Illuminate\Http\Request $request) {
+        return redirect('/discussion')->with('status', 'Create discussion belum diaktifkan (placeholder UI).');
+    });
+
+    // Edit discussion (UI placeholder, belum tersimpan ke DB)
+    Route::get('/discussion/{id}/edit', function ($id) {
+        $threads = laracussDummyThreads();
+        $thread = $threads[(int) $id] ?? null;
+
+        if (!$thread) {
+            return redirect('/discussion')->with('status', 'Thread tidak ditemukan.');
+        }
+
+        return view('discussion-edit', [
+            'thread' => $thread,
+        ]);
+    })->where('id', '[0-9]+');
+
+    Route::post('/discussion/{id}/edit', function ($id) {
+        return redirect('/discussion/' . $id)->with('status', 'Edit discussion belum diaktifkan (placeholder UI).');
+    })->where('id', '[0-9]+');
 });
-
-Route::post('/discussion/create', function (\Illuminate\Http\Request $request) {
-    return redirect('/discussion')->with('status', 'Create discussion belum diaktifkan (placeholder UI).');
-});
-
-// Edit discussion (UI placeholder, belum tersimpan ke DB)
-Route::get('/discussion/{id}/edit', function ($id) {
-    $threads = laracussDummyThreads();
-    $thread = $threads[(int) $id] ?? null;
-
-    if (!$thread) {
-        return redirect('/discussion')->with('status', 'Thread tidak ditemukan.');
-    }
-
-    return view('discussion-edit', [
-        'thread' => $thread,
-    ]);
-})->where('id', '[0-9]+');
-
-Route::post('/discussion/{id}/edit', function ($id) {
-    return redirect('/discussion/' . $id)->with('status', 'Edit discussion belum diaktifkan (placeholder UI).');
-})->where('id', '[0-9]+');
 
 Route::get('/discussion/{id?}', function ($id = null) {
     if ($id) {
@@ -128,6 +131,13 @@ function laracussDefaultProfileData(string $userName): array
 function laracussResolveProfileData(\Illuminate\Http\Request $request, string $userName): array
 {
     $default = laracussDefaultProfileData($userName);
+    $authUser = Auth::user();
+
+    if ($authUser && (string) ($authUser->username ?? '') === $userName) {
+        $default['displayName'] = (string) $authUser->username;
+        $default['photo'] = (string) ($authUser->picture ?? '');
+    }
+
     $overrides = $request->session()->get('profile_overrides', []);
     $saved = $overrides[$userName] ?? [];
 
@@ -141,84 +151,107 @@ function laracussResolvePasswordHash(\Illuminate\Http\Request $request, string $
         return $hashes[$userName];
     }
 
-    // Default demo password for this prototype profile feature.
     return Hash::make('password123');
 }
 
-Route::get('/profile/{name?}/edit', function (\Illuminate\Http\Request $request, $name = null) {
-    $userName = $name ?: 'Rafi';
-    $profileData = laracussResolveProfileData($request, $userName);
+function laracussAuthorizeProfileOwner(?string $requestedName): string
+{
+    $authUser = Auth::user();
+    $authUsername = is_object($authUser) ? (string) ($authUser->username ?? '') : '';
 
-    return view('profile-edit', [
-        'userName' => $userName,
-        'profileData' => $profileData,
-    ]);
-})->where('name', '[A-Za-z]+');
-
-Route::post('/profile/{name?}/edit', function (\Illuminate\Http\Request $request, $name = null) {
-    $userName = $name ?: 'Rafi';
-
-    $validated = $request->validate([
-        'displayName' => ['required', 'string', 'max:60'],
-        'bio' => ['nullable', 'string', 'max:280'],
-        'location' => ['nullable', 'string', 'max:80'],
-        'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
-        'current_password' => ['nullable', 'string', 'required_with:new_password'],
-        'new_password' => ['nullable', 'string', 'min:8', 'confirmed', 'required_with:current_password'],
-    ]);
-
-    $photoPath = '';
-    if ($request->hasFile('photo')) {
-        $file = $request->file('photo');
-        $dir = public_path('uploads/profile');
-        File::ensureDirectoryExists($dir);
-
-        $filename = 'profile-' . strtolower($userName) . '-' . time() . '.' . $file->getClientOriginalExtension();
-        $file->move($dir, $filename);
-        $photoPath = 'uploads/profile/' . $filename;
+    if ($authUsername === '') {
+        abort(403, 'Anda tidak memiliki akses ke halaman ini.');
     }
 
-    $profileOnly = [
-        'displayName' => $validated['displayName'],
-        'bio' => $validated['bio'] ?? '',
-        'location' => $validated['location'] ?? '',
-        'photo' => $photoPath !== '' ? $photoPath : (($request->session()->get('profile_overrides', [])[$userName]['photo'] ?? '')),
-    ];
+    if ($requestedName !== null && $requestedName !== '' && $requestedName !== $authUsername) {
+        abort(403, 'Anda hanya dapat mengedit profil milik sendiri.');
+    }
 
-    $overrides = $request->session()->get('profile_overrides', []);
-    $overrides[$userName] = $profileOnly;
-    $request->session()->put('profile_overrides', $overrides);
+    return $authUsername;
+}
 
-    $passwordUpdated = false;
-    $newPassword = $validated['new_password'] ?? '';
+Route::middleware('auth')->group(function () {
+    Route::get('/profile/{name?}/edit', function (\Illuminate\Http\Request $request, $name = null) {
+        $userName = laracussAuthorizeProfileOwner($name);
+        $profileData = laracussResolveProfileData($request, $userName);
 
-    if ($newPassword !== '') {
-        $currentPassword = $validated['current_password'] ?? '';
-        $currentHash = laracussResolvePasswordHash($request, $userName);
+        return view('profile-edit', [
+            'userName' => $userName,
+            'profileData' => $profileData,
+        ]);
+    })->where('name', '[A-Za-z0-9_-]+');
 
-        if (!Hash::check($currentPassword, $currentHash)) {
-            return back()
-                ->withErrors(['current_password' => 'Password saat ini tidak sesuai.'])
-                ->withInput();
+    Route::post('/profile/{name?}/edit', function (\Illuminate\Http\Request $request, $name = null) {
+        $userName = laracussAuthorizeProfileOwner($name);
+
+        $validated = $request->validate([
+            'displayName' => ['required', 'string', 'max:60'],
+            'bio' => ['nullable', 'string', 'max:280'],
+            'location' => ['nullable', 'string', 'max:80'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'current_password' => ['nullable', 'string', 'required_with:new_password'],
+            'new_password' => ['nullable', 'string', 'min:8', 'confirmed', 'required_with:current_password'],
+        ]);
+
+        $photoPath = '';
+        if ($request->hasFile('photo')) {
+            $file = $request->file('photo');
+            $dir = public_path('uploads/profile');
+            File::ensureDirectoryExists($dir);
+
+            $filename = 'profile-' . strtolower($userName) . '-' . time() . '.' . $file->getClientOriginalExtension();
+            $file->move($dir, $filename);
+            $photoPath = 'uploads/profile/' . $filename;
         }
 
-        $hashes = $request->session()->get('profile_password_hashes', []);
-        $hashes[$userName] = Hash::make($newPassword);
-        $request->session()->put('profile_password_hashes', $hashes);
-        $passwordUpdated = true;
-    }
+        $profileOnly = [
+            'displayName' => $validated['displayName'],
+            'bio' => $validated['bio'] ?? '',
+            'location' => $validated['location'] ?? '',
+            'photo' => $photoPath !== '' ? $photoPath : (($request->session()->get('profile_overrides', [])[$userName]['photo'] ?? '')),
+        ];
 
-    $status = $passwordUpdated
-        ? 'Profil dan password berhasil diperbarui.'
-        : 'Profil berhasil diperbarui.';
+        $overrides = $request->session()->get('profile_overrides', []);
+        $overrides[$userName] = $profileOnly;
+        $request->session()->put('profile_overrides', $overrides);
 
-    return redirect('/profile/' . $userName)->with('status', $status);
-})->where('name', '[A-Za-z]+');
+        $authUser = Auth::user();
+        if ($authUser && (string) ($authUser->username ?? '') === $userName && $photoPath !== '') {
+            $authUser->picture = $photoPath;
+            $authUser->save();
+        }
+
+        $passwordUpdated = false;
+        $newPassword = $validated['new_password'] ?? '';
+
+        if ($newPassword !== '') {
+            $currentPassword = $validated['current_password'] ?? '';
+            $currentHash = laracussResolvePasswordHash($request, $userName);
+
+            if (!Hash::check($currentPassword, $currentHash)) {
+                return back()
+                    ->withErrors(['current_password' => 'Password saat ini tidak sesuai.'])
+                    ->withInput();
+            }
+
+            $hashes = $request->session()->get('profile_password_hashes', []);
+            $hashes[$userName] = Hash::make($newPassword);
+            $request->session()->put('profile_password_hashes', $hashes);
+            $passwordUpdated = true;
+        }
+
+        $status = $passwordUpdated
+            ? 'Profil dan password berhasil diperbarui.'
+            : 'Profil berhasil diperbarui.';
+
+        return redirect('/profile/' . $userName)->with('status', $status);
+    })->where('name', '[A-Za-z0-9_-]+');
+});
 
 Route::get('/profile/{name?}', function (\Illuminate\Http\Request $request, $name = null) {
     $threads = laracussDummyThreads();
 
-    $userName = $name ?: 'Rafi';
+    $userName = $name ?: (Auth::user()->username ?? 'Rafi');
     $profileData = laracussResolveProfileData($request, $userName);
     $questions = [];
     $answers = [];
@@ -245,7 +278,7 @@ Route::get('/profile/{name?}', function (\Illuminate\Http\Request $request, $nam
         'questions' => $questions,
         'answers' => $answers,
     ]);
-})->where('name', '[A-Za-z]+');
+})->where('name', '[A-Za-z0-9_-]+');
 
 Route::get('/about-us', function () {
     return view('about-us');
@@ -256,20 +289,4 @@ Route::get('/search', function (\Illuminate\Http\Request $request) {
     return view('search', ['q' => $q]);
 });
 
-Route::get('/login', function () {
-    return view('login');
-});
-
-Route::post('/login', function () {
-    // Placeholder: nanti bisa diganti ke auth controller / Laravel Breeze/Fortify.
-    return back()->with('status', 'Login belum diaktifkan. Ini hanya halaman UI.');
-});
-
-Route::get('/register', function () {
-    return view('register');
-});
-
-Route::post('/register', function () {
-    // Placeholder: nanti bisa diganti ke auth controller / Laravel Breeze/Fortify.
-    return back()->with('status', 'Registrasi belum diaktifkan. Ini hanya halaman UI.');
-});
+require __DIR__ . '/auth.php';

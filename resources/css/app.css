@@ -2,4 +2,3 @@
    Kita arahkan ke SCSS utama supaya gaya dari `resources/scss/**` ter-compile. */
 
 @import "../scss/app.scss";
-
