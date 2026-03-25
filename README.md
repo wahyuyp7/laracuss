@@ -2,7 +2,7 @@
 
 Laracuss adalah prototype platform diskusi seputar coding yang dibangun dengan Laravel, Blade, SCSS, dan Bootstrap.
 
-Fokus project saat ini ada di sisi frontend/UI: pengalaman diskusi, halaman profil user, dan alur create/edit konten dengan data dummy.
+Saat ini project sudah memiliki auth dasar berbasis Laravel Breeze, struktur database awal, serta UI diskusi/profil yang siap dilanjutkan ke backend penuh.
 
 ## Fitur Utama
 
@@ -17,8 +17,12 @@ Fokus project saat ini ada di sisi frontend/UI: pengalaman diskusi, halaman prof
 - Halaman profil user:
   - daftar pertanyaan dan jawaban user,
   - share profil,
-  - edit profil (display name, bio, lokasi, foto, ganti password dummy).
-- Halaman login dan register dengan desain konsisten Bootstrap + toggle show/hide password.
+  - edit profil (display name, bio, lokasi, foto, ganti password).
+- Authentication:
+  - login, register, logout (Laravel Breeze),
+  - middleware `auth`/`guest`,
+  - authorization edit profil (hanya pemilik akun),
+  - avatar user di navbar + dropdown menu (Profile/Edit Profile/Logout).
 - Halaman About Us dan Search.
 
 ## Tech Stack
@@ -27,14 +31,15 @@ Fokus project saat ini ada di sisi frontend/UI: pengalaman diskusi, halaman prof
 - Blade Template
 - Bootstrap (SCSS + JS via Vite)
 - JavaScript (vanilla)
+- Laravel Breeze (auth scaffolding)
 
 ## Status Project Saat Ini
 
-- Ini masih prototype/frontend-first.
-- Fitur auth, create/edit diskusi, dan persistence data masih placeholder.
+- Ini masih prototype dengan fokus frontend + backend dasar.
+- Fitur auth sudah aktif (Breeze), tetapi modul diskusi masih banyak yang dummy data.
 - Beberapa interaksi UI memakai:
   - `localStorage` (contoh: like reply, edit reply),
-  - `session` Laravel (contoh: override data profil dummy).
+  - kombinasi `session` dan database untuk data profil.
 
 ## Struktur Halaman
 
@@ -43,14 +48,15 @@ Route utama yang sudah tersedia:
 - `/` atau `/home` - Home
 - `/discussion` - List diskusi
 - `/discussion/{id}` - Detail diskusi
-- `/discussion/create` - Create diskusi (UI)
-- `/discussion/{id}/edit` - Edit diskusi (UI)
+- `/discussion/create` - Create diskusi (auth required, UI placeholder)
+- `/discussion/{id}/edit` - Edit diskusi (auth required, UI placeholder)
 - `/profile/{name?}` - Profil user
-- `/profile/{name?}/edit` - Edit profil
+- `/profile/{name?}/edit` - Edit profil (auth + owner only)
 - `/about-us` - About Us
 - `/search` - Search
-- `/login` - Login (UI)
-- `/register` - Register (UI)
+- `/login` - Login
+- `/register` - Register
+- `/logout` - Logout (POST)
 
 ## Cara Menjalankan Project
 
@@ -67,6 +73,8 @@ composer install
 npm install
 cp .env.example .env
 php artisan key:generate
+php artisan migrate
+php artisan db:seed
 ```
 
 Jalankan development server:
@@ -86,14 +94,17 @@ npm run build
 
 - Upload foto profil disimpan ke `public/uploads/profile`.
 - Favicon project saat ini menggunakan `public/favicon.png`.
-- Karena ini prototype, data belum terhubung ke database untuk fitur diskusi/profil secara penuh.
+- Seeder membuat akun demo login:
+  - email: `demo@laracuss.test`
+  - password: `password123`
+- Data diskusi/profil masih campuran dummy + backend awal (akan dimigrasikan penuh bertahap).
 
 ## Rencana Pengembangan Berikutnya
 
-- Integrasi autentikasi Laravel (Breeze/Fortify/Sanctum).
-- Migrasi dari dummy data ke database (thread, reply, like, bookmark, profile).
-- Validasi dan authorization berbasis user login.
-- Unit/feature test untuk route dan flow diskusi.
+- Migrasi penuh fitur diskusi ke database (`discussions`, `answers`, relasi kategori/user).
+- Integrasi like/bookmark/reply dari `localStorage` ke database.
+- Refactor route closure ke controller + request class untuk maintainability.
+- Penguatan test end-to-end untuk flow auth, profile, dan diskusi.
 
 ## Lisensi
 
